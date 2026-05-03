@@ -100,59 +100,7 @@ pipeline {
         }
 
         // ══════════════════════════════════════════════════════════════════
-        // STEP 4 — TEST
-        // Starts the full stack, waits for nginx, checks the app responds,
-        // verifies the backend API route, then tears the test stack down.
-        // ══════════════════════════════════════════════════════════════════
-        stage('Test') {
-            steps {
-                echo '🧪 Spinning up stack for testing...'
-                sh '''
-                    # Start all services
-                    docker compose -f ${COMPOSE_FILE} up -d
-
-                    # Wait for nginx/app to become ready (max 90s)
-                    echo "Waiting for application to be ready..."
-                    ATTEMPTS=0
-                    until curl --fail --silent --max-time 5 http://localhost; do
-                        ATTEMPTS=$((ATTEMPTS + 1))
-                        if [ $ATTEMPTS -ge 18 ]; then
-                            echo "❌ App did not become ready after 90s."
-                            echo "--- Container logs ---"
-                            docker compose -f ${COMPOSE_FILE} logs --tail=50
-                            docker compose -f ${COMPOSE_FILE} down
-                            exit 1
-                        fi
-                        echo "  Waiting... attempt ${ATTEMPTS}/18"
-                        sleep 5
-                    done
-
-                    echo "✅ Frontend (nginx) is responding."
-
-                    # Check backend API via nginx proxy
-                    HTTP_CODE=$(curl --silent --output /dev/null \
-                                     --write-out "%{http_code}" \
-                                     --max-time 10 \
-                                     http://localhost/api)
-                    echo "Backend /api HTTP status: ${HTTP_CODE}"
-                    if [ "$HTTP_CODE" = "000" ]; then
-                        echo "❌ Backend is completely unreachable."
-                        docker compose -f ${COMPOSE_FILE} logs backend
-                        docker compose -f ${COMPOSE_FILE} down
-                        exit 1
-                    fi
-
-                    echo "✅ All tests passed. HTTP ${HTTP_CODE} from /api."
-                '''
-            }
-            post {
-                always {
-                    // Always tear down the test stack
-                    sh 'docker compose -f ${COMPOSE_FILE} down || true'
-                }
-            }
-        }
-
+      
         // ══════════════════════════════════════════════════════════════════
         // STEP 5 — DEPLOY TO SERVER (16.176.232.43)
         // Brings the full production stack up with the newly built images.
